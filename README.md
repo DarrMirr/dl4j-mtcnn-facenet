@@ -1,7 +1,7 @@
 # dl4j-mtcnn-facenet
 
 **Face recognition application uses:**
-- Multi-task Cascaded Convolutional Networks (MTCNN) to detect face on image
+- Multi-task Cascaded Convolutional Networks (MTCNN) to detect faces on image
 - Inception ResNet V1 neural network to build face feature vector
 - Euclidean distance (as default) to calculate similarity between two face feature vectors. 
 There is cosine distance verifier in application. Change `@Qualifier(FeatureVerifier.EUCLIDEAN_DISTANCE)` to `@Qualifier(FeatureVerifier.COSINE_DISTANCE)` in constructor of DataSetFeatureBank class in order to switch between two algorithm.
