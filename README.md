@@ -1,4 +1,4 @@
-# dl4j-facenet-mtcnn
+# dl4j-mtcnn-facenet
 
 **Face recognition application uses:**
 - Multi-task Cascaded Convolutional Networks (MTCNN) to detect face on image
