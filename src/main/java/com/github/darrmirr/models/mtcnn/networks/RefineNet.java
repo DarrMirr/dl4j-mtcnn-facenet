@@ -5,6 +5,7 @@ import com.github.darrmirr.models.mtcnn.networks.dl4j.RefineNetModel;
 import com.github.darrmirr.utils.Nd4jUtils;
 import org.deeplearning4j.nn.graph.ComputationGraph;
 import org.nd4j.linalg.api.ndarray.INDArray;
+import org.nd4j.linalg.factory.Nd4j;
 import org.nd4j.linalg.indexing.conditions.Conditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -66,8 +67,15 @@ public class RefineNet {
             return null;
         }
         totalBoxes = mtcnnUtils.squeeze(mtcnnUtils.mergeRegAndScore(totalBoxes, reg, score).get(ipass).dup());
+        // or expand dimension to rank 2?
+        if (totalBoxes.rank() == 1) {
+            return null;
+        }
         // 05. Non-Maximum Suppression for all boxes
         totalBoxes = mtcnnUtils.nms(totalBoxes, 0.7, false);
+        if (totalBoxes.rank() == 1) {
+            return null;
+        }
         // 06. Convert bounding box coordinates to “un-scaled image” coordinates
         totalBoxes = mtcnnUtils.bbreg(totalBoxes);
         long[] imgShape = shape(img);

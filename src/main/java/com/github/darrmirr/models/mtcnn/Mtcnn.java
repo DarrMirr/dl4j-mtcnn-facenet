@@ -1,19 +1,20 @@
 package com.github.darrmirr.models.mtcnn;
 
-import com.github.darrmirr.utils.ResultBox;
 import com.github.darrmirr.models.mtcnn.networks.OutputNet;
 import com.github.darrmirr.models.mtcnn.networks.ProposeNet;
 import com.github.darrmirr.models.mtcnn.networks.RefineNet;
+import com.github.darrmirr.utils.BoundBox;
+import com.github.darrmirr.utils.Nd4jUtils;
 import org.nd4j.linalg.api.ndarray.INDArray;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
-
-import static org.nd4j.linalg.indexing.NDArrayIndex.all;
-import static org.nd4j.linalg.indexing.NDArrayIndex.interval;
+import java.util.stream.Collectors;
 
 @Component
 public class Mtcnn {
@@ -23,6 +24,7 @@ public class Mtcnn {
     private OutputNet outputNet;
     private MtcnnUtils mtcnnUtils;
     private double thresholds[] = { 0.6, 0.7, 0.7 };
+    private int optimizedScaleSize = 600;
 
     @Autowired
     public Mtcnn(ProposeNet proposeNet, RefineNet refineNet, OutputNet outputNet, MtcnnUtils mtcnnUtils) {
@@ -40,35 +42,42 @@ public class Mtcnn {
      * @param img input image to detect faces in it
      * @return bounded boxes
      */
-    public ResultBox[] detectFaces(INDArray img) {
+    public List<BoundBox> detectFaces(INDArray img) {
         logger.debug("detectFaces : started");
-        var resultBoxes = Optional
-                .ofNullable(img)
+        var scaledImage = Nd4jUtils.scale(img, optimizedScaleSize);
+        var boundBoxes = Optional
+                .ofNullable(scaledImage)
                 .map(image ->
                         proposeNet.execute(image, thresholds[0]))
                 .map(proposeBoxes ->
-                        refineNet.execute(img, proposeBoxes, thresholds[1]))
+                        refineNet.execute(scaledImage, proposeBoxes, thresholds[1]))
                 .map(refinedProposeBoxes ->
-                        outputNet.execute(img, refinedProposeBoxes, thresholds[2]))
-                .map(ResultBox::create)
-                .orElse(null);
+                        outputNet.execute(scaledImage, refinedProposeBoxes, thresholds[2]))
+                .map(BoundBox::create)
+                .orElse(Collections.emptyList());
+
+        //        var newImageMatrix = imageUtils.drawBoundBox(boundBox, imageMatrix);
+        //        imageUtils.toFile(newImageMatrix, "jpg", image.getName());
+
+        int originalHeight = (int) img.shape()[2];
+        int originalWidth = (int) img.shape()[3];
+        if(originalHeight > optimizedScaleSize || originalWidth > optimizedScaleSize) {
+            var scale = originalHeight > originalWidth ? (double) originalHeight / optimizedScaleSize : (double) originalWidth / optimizedScaleSize;
+            boundBoxes = reScale(boundBoxes, scale, originalHeight, originalWidth);
+        }
         logger.debug("detectFaces : finished");
-        return resultBoxes;
+        return boundBoxes;
     }
 
-    public INDArray[] getFaceImages(INDArray img, int width, int height) {
-        ResultBox[] boxes = detectFaces(img);
-        if(boxes == null) {
-            return null;
-        }
-        INDArray[] ret = new INDArray[boxes.length];
-        for(int i = 0;i < ret.length;i++) {
-            var x1 = boxes[0].x1 >= 0 ? boxes[0].x1 : 0;
-            var x2 = boxes[0].x2 >= 0 ? boxes[0].x2 : 0;
-            var y1 = boxes[0].y1 >= 0 ? boxes[0].y1 : 0;
-            var y2 = boxes[0].y2 >= 0 ? boxes[0].y2 : 0;
-            ret[i] = mtcnnUtils.imresample(img.get(all(), all(), interval(y1, y2), interval(x1, x2)).dup(), height, width);
-        }
-        return ret;
+    private List<BoundBox> reScale(List<BoundBox> boundBoxes, double scale, int originalHeight, int originalWidth){
+        return boundBoxes
+                .stream()
+                .map(box -> {
+                    var originalBbox = mtcnnUtils.scale(box, scale);
+                    originalBbox.sourceHeight = originalHeight;
+                    originalBbox.sourceWidth = originalWidth;
+                    return originalBbox;
+                })
+                .collect(Collectors.toList());
     }
 }

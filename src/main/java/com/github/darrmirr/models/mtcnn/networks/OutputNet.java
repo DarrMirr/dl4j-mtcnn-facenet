@@ -63,6 +63,9 @@ public class OutputNet {
             return null;
         }
         totalBoxes = mtcnnUtils.squeeze(mtcnnUtils.mergeRegAndScore(totalBoxes, reg, score).get(ipass).dup());
+        if (totalBoxes.rank() == 1) {
+            return null;
+        }
         // 05. Convert bounding box and facial landmark coordinates to “un-scaled image” coordinates
         totalBoxes = mtcnnUtils.bbreg(totalBoxes);
         // 06. Non-Maximum Suppression for all boxes

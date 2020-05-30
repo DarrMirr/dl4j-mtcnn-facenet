@@ -1,6 +1,7 @@
 package com.github.darrmirr.models.mtcnn;
 
 import com.github.darrmirr.utils.ArgSortParam;
+import com.github.darrmirr.utils.BoundBox;
 import com.github.darrmirr.utils.Nd4jUtils;
 import org.nd4j.linalg.api.ndarray.INDArray;
 import org.nd4j.linalg.api.shape.Shape;
@@ -147,24 +148,6 @@ public class MtcnnUtils {
         return arr.permutei(0,1,3,2);
     }
 
-    public INDArray imresample(INDArray img, int hs, int ws) {
-        long[] shape = img.shape();
-            long h = shape[2];
-            long w = shape[3];
-            float dx = (float) w / ws;
-            float dy = (float) h / hs;
-            INDArray im_data = Nd4j.create(new long[] { 1, 3, hs, ws });
-        for (int a1 = 0; a1 < 3; a1++) {
-            for (int a2 = 0; a2 < hs; a2++) {
-                for (int a3 = 0; a3 < ws; a3++) {
-                    im_data.putScalar(new long[] { 0, a1, a2, a3 },
-                            img.getDouble(0, a1, (long) Math.floor(a2 * dy), (long) Math.floor(a3 * dx)));
-                }
-            }
-        }
-        return im_data;
-    }
-
     /**
      * Convert the bounding box coordinates to coordinates of the actual image.
      * Right now, the coordinates of each bounding box is a value between 0 and 1,
@@ -235,7 +218,7 @@ public class MtcnnUtils {
         long[] boxShape = Nd4j.shape(totalBoxes);
         INDArray ret = Nd4j.create(boxShape[0], img.shape()[1], border, border);
         for (int i = 0; i < boxShape[0]; i++) {
-            INDArray reshapedImg = imresample(
+            INDArray reshapedImg = Nd4jUtils.imresample(
                     img.get(all(), all(), interval(totalBoxes.getInt(i, 1), totalBoxes.getInt(i, 3)),
                             interval(totalBoxes.getInt(i, 0), totalBoxes.getInt(i, 2))).dup(),
                     border, border);
@@ -272,5 +255,20 @@ public class MtcnnUtils {
                 reg.get(point(0), point(2), all(), all()).get(fitIndexes).transposei(),
                 reg.get(point(0), point(1), all(), all()).get(fitIndexes).transposei(),
                 reg.get(point(0), point(0), all(), all()).get(fitIndexes).transposei());
+    }
+
+    public BoundBox scale(BoundBox box, double scale) {
+        BoundBox originalBox = new BoundBox();
+        originalBox.x1 = (int) Math.ceil(box.x1 * scale);
+        originalBox.y1 = (int) Math.ceil(box.y1 * scale);
+        originalBox.x2 = (int) Math.ceil(box.x2 * scale);
+        originalBox.y2 = (int) Math.ceil(box.y2 * scale);
+        return originalBox;
+    }
+
+    public BoundBox scale(BoundBox box, int size2scale) {
+        double scale = box.sourceWidth > box.sourceHeight ?
+                (double) size2scale / box.sourceWidth : (double) size2scale / box.sourceHeight;
+        return scale(box, scale);
     }
 }

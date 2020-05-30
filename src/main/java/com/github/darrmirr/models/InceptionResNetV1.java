@@ -19,7 +19,6 @@ import org.nd4j.linalg.api.ndarray.INDArray;
 import org.nd4j.linalg.io.ClassPathResource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.PostConstruct;
@@ -28,7 +27,6 @@ import java.lang.reflect.Field;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.*;
-import java.util.stream.Collectors;
 
 import static java.util.Collections.enumeration;
 import static org.deeplearning4j.nn.conf.ConvolutionMode.Truncate;
@@ -88,6 +86,16 @@ public class InceptionResNetV1 implements Dl4jModel {
     @Override
     public String getWeightsPath() {
         return WEIGHTS_PATH;
+    }
+
+    @Override
+    public int inputWidth() {
+        return 160;
+    }
+
+    @Override
+    public int inputHeight() {
+        return 160;
     }
 
     private ComputationGraphConfiguration buildConfiguration(long[] inputShape) throws Exception {

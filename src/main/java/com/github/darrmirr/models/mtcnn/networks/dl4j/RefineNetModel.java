@@ -25,6 +25,16 @@ public class RefineNetModel implements Dl4jModel {
         this(new long[] { 24, 24, 3 });
     }
 
+    @Override
+    public int inputWidth() {
+        return 24;
+    }
+
+    @Override
+    public int inputHeight() {
+        return 24;
+    }
+
     private ComputationGraphConfiguration buildConfiguration(long[] inputShape) {
         String input = "input";
         ComputationGraphConfiguration.GraphBuilder builder = new NeuralNetConfiguration.Builder().graphBuilder().addInputs(input)

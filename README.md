@@ -15,3 +15,4 @@ Main differences:
 - make refactoring in order to simplify code
 - rewrite mtcnn utils methods using ND4J and DL4J features
 - add methods documentation 
+- make some optimization to perform face detect on image with large size

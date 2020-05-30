@@ -1,5 +1,6 @@
 package com.github.darrmirr.models.mtcnn;
 
+import com.github.darrmirr.utils.Nd4jUtils;
 import org.junit.Test;
 import org.nd4j.linalg.factory.Nd4j;
 import org.nd4j.linalg.indexing.conditions.Conditions;
@@ -20,7 +21,7 @@ public class MtcnnUtilsTest {
         var inputArray = Nd4j.readBinary(input.getFile());
         var outputArray = Nd4j.readBinary(output.getFile());
 
-        var scaledArray = mtcnnUtils.imresample(inputArray, 35, 35);
+        var scaledArray = Nd4jUtils.imresample(inputArray, 35, 35);
 
         assertThat(scaledArray.eq(outputArray).minNumber(), is(1.0));
     }

@@ -6,7 +6,6 @@ import com.github.darrmirr.utils.Nd4jUtils;
 import org.deeplearning4j.nn.graph.ComputationGraph;
 import org.nd4j.linalg.api.ndarray.INDArray;
 import org.nd4j.linalg.factory.Nd4j;
-import org.nd4j.linalg.indexing.conditions.Conditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,8 +15,6 @@ import javax.annotation.PostConstruct;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Optional;
-import java.util.stream.Collectors;
 
 import static org.nd4j.linalg.indexing.NDArrayIndex.all;
 import static org.nd4j.linalg.indexing.NDArrayIndex.point;
@@ -69,7 +66,7 @@ public class ProposeNet {
         for (double scale : scales) {
             // 03.- 06.
             var boxes = evaluateBoxes(img, threshold, scale);
-            if (boxes == null) {
+            if (boxes == null || boxes.rank() == 1) {
                 continue;
             }
             // 07. Non-Maximum Suppression for kernels in each scaled image
@@ -77,7 +74,7 @@ public class ProposeNet {
             totalBoxes = mergeBoxes(totalBoxes, boxes);
         }
 
-        if (totalBoxes == null) {
+        if (totalBoxes == null || totalBoxes.rank() == 1) {
             return null;
         }
         // 08. Non-Maximum Suppression for all kernels
@@ -123,7 +120,6 @@ public class ProposeNet {
             ret[i] = scales.get(i).doubleValue();
         }
         return ret;
-//        return scales.stream().mapToDouble(Double::doubleValue).toArray();
     }
 
     /**
@@ -155,17 +151,20 @@ public class ProposeNet {
 
     public INDArray scaleAndNorm(INDArray img, double scale) {
         long[] shape = mtcnnUtils.shape(img);
-        INDArray ret = mtcnnUtils.imresample(img, (int) Math.ceil(shape[2] * scale), (int) Math.ceil(shape[3] * scale));
+        INDArray ret = Nd4jUtils.imresample(img, (int) Math.ceil(shape[2] * scale), (int) Math.ceil(shape[3] * scale));
         return ret.subi(127.5).muli(0.0078125);
     }
 
     private INDArray mergeBoxes(INDArray totalBoxes, INDArray boxes) {
+        if (boxes == null) {
+            return totalBoxes;
+        }
         if(boxes.rank() == 1) {
             boxes = Nd4j.expandDims(boxes, 0);
         }
-        if (totalBoxes == null) {
+        if (totalBoxes == null || totalBoxes.shape().length == 0) {
             totalBoxes = boxes;
-        } else {
+        } else if (boxes.shape().length != 0) {
             return Nd4j.concat(0, totalBoxes, boxes);
         }
         return totalBoxes;

@@ -25,6 +25,16 @@ public class ProposeNetModel implements Dl4jModel {
         this(3);
     }
 
+    @Override
+    public int inputWidth() {
+        return -1;
+    }
+
+    @Override
+    public int inputHeight() {
+        return -1;
+    }
+
     private ComputationGraphConfiguration buildConfiguration(long channels) {
         String input = "input";
         ComputationGraphConfiguration.GraphBuilder builder = new NeuralNetConfiguration.Builder().graphBuilder().addInputs(input)

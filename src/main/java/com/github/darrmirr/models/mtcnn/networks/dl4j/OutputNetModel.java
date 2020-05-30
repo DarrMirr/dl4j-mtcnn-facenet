@@ -25,6 +25,15 @@ public class OutputNetModel implements Dl4jModel {
         this(new long[] { 48, 48, 3 });
     }
 
+    @Override
+    public int inputWidth() {
+        return 48;
+    }
+
+    @Override
+    public int inputHeight() {
+        return 48;
+    }
 
     private ComputationGraphConfiguration buildConfiguration(long[] inputShape) {
         String input = "input";

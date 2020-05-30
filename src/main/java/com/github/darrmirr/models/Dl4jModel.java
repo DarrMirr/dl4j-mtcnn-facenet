@@ -15,6 +15,10 @@ public interface Dl4jModel {
 
     String getWeightsPath();
 
+    int inputWidth();
+
+    int inputHeight();
+
     default ComputationGraph getGraph() throws IOException {
         ComputationGraph graph = new ComputationGraph(getConfiguration());
         graph.init();

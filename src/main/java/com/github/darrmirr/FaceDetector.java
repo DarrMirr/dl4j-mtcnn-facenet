@@ -1,11 +1,14 @@
 package com.github.darrmirr;
 
+import com.github.darrmirr.models.Dl4jModel;
 import com.github.darrmirr.models.InceptionResNetV1;
 import com.github.darrmirr.models.mtcnn.Mtcnn;
+import com.github.darrmirr.utils.FaceFeatures;
+import com.github.darrmirr.utils.ImageFace;
 import com.github.darrmirr.utils.ImageUtils;
+import com.github.darrmirr.utils.Nd4jUtils;
 import org.datavec.image.loader.NativeImageLoader;
 import org.deeplearning4j.nn.graph.ComputationGraph;
-import org.nd4j.linalg.api.ndarray.INDArray;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,7 +17,7 @@ import org.springframework.stereotype.Component;
 import javax.annotation.PostConstruct;
 import java.io.File;
 import java.io.IOException;
-import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 import static java.util.stream.Collectors.toList;
@@ -34,19 +37,21 @@ public class FaceDetector {
     private NativeImageLoader loader = new NativeImageLoader();
     private Mtcnn mtcnn;
     private ImageUtils imageUtils;
-    private InceptionResNetV1 inceptionResNetV1;
+    private Dl4jModel model;
     private ComputationGraph faceFeatureExtracter;
+    private Nd4jUtils nd4jUtils;
 
     @Autowired
-    public FaceDetector(Mtcnn mtcnn, InceptionResNetV1 inceptionResNetV1, ImageUtils imageUtils) {
+    public FaceDetector(Mtcnn mtcnn, InceptionResNetV1 model, ImageUtils imageUtils, Nd4jUtils nd4jUtils) {
         this.mtcnn = mtcnn;
         this.imageUtils = imageUtils;
-        this.inceptionResNetV1 = inceptionResNetV1;
+        this.model = model;
+        this.nd4jUtils = nd4jUtils;
     }
 
     @PostConstruct
     public void init() throws IOException {
-        faceFeatureExtracter = inceptionResNetV1.getGraph();
+        faceFeatureExtracter = model.getGraph();
     }
 
     /**
@@ -57,9 +62,16 @@ public class FaceDetector {
      * @throws IOException exception while file is read
      */
 
-    public INDArray[] detectFaces(File image) throws IOException {
+    public List<ImageFace> detectFaces(File image) throws IOException {
         var imageMatrix = loader.asMatrix(image);
-        return mtcnn.getFaceImages(imageMatrix, 160, 160);
+        return mtcnn
+                .detectFaces(imageMatrix)
+                .stream()
+                .map(boundBox -> {
+                    var imageFace = nd4jUtils.crop(boundBox, imageMatrix);
+                    return new ImageFace(imageFace, boundBox);
+                })
+                .collect(toList());
     }
 
     /**
@@ -68,12 +80,14 @@ public class FaceDetector {
      * @param faces INDArray represent faces on image (image size depend on model)
      * @return list of face feature vectors
      */
-    public List<INDArray> extractFeatures(INDArray[] faces) {
-        return Arrays
-                .stream(faces)
-                .map(faceFeatureExtracter::output)
-                .map(output -> output[1])
-                .collect(toList());
+    public List<ImageFace> extractFeatures(List<ImageFace> faces) {
+        logger.info("Extract features from faces : {}", faces.size());
+        faces.stream().parallel().forEach(imageFace -> {
+            var resizedFace = Nd4jUtils.imresample(imageFace.get(), model.inputHeight(), model.inputWidth());
+            var output = faceFeatureExtracter.output(resizedFace)[1];
+            imageFace.setFeatureVector(output);
+        });
+        return faces;
     }
 
     /**
@@ -84,24 +98,23 @@ public class FaceDetector {
      * @throws IOException exception while file is read
      */
 
-    public List<INDArray> getFaceFeatures(File image) throws IOException {
-        INDArray[] detectedFaces = detectFaces(image);
+    public FaceFeatures getFaceFeatures(File image) throws IOException {
+        logger.info("start : {}", image.getName());
+        var detectedFaces = detectFaces(image);
 
-        if(detectedFaces == null) {
-            logger.warn("no face detected in image file:{}", image);
-            return null;
-        }
-        if(detectedFaces.length > 1) {
-            logger.warn("{} faces detected in image file:{}, the first detected face will be used.",
-                    detectedFaces.length, image);
+        if(detectedFaces == null || detectedFaces.isEmpty()) {
+            logger.warn("no face detected in image file : {}", image);
+            return new FaceFeatures(image, Collections.emptyList());
         }
 
         if(logger.isDebugEnabled()) {
             logger.debug("save detected face image");
-            for (int i = 0; i < detectedFaces.length; i++) {
-                imageUtils.toFile(detectedFaces[i], "jpg", image.getName() + "_" + i);
+            for (int i = 0; i < detectedFaces.size(); i++) {
+                imageUtils.toFile(detectedFaces.get(i).getImageFace(), "jpg", i + "_" + image.getName() );
             }
         }
-        return extractFeatures(detectedFaces);
+        var imageFaces = extractFeatures(detectedFaces);
+        logger.info("end : {}", image.getName());
+        return new FaceFeatures(image, imageFaces);
     }
 }

@@ -1,7 +1,7 @@
 package com.github.darrmirr;
 
 import com.github.darrmirr.featurebank.FeatureBank;
-import org.nd4j.linalg.api.ndarray.INDArray;
+import com.github.darrmirr.utils.ImageFace;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -46,12 +46,10 @@ public class Application {
         logger.info("Filling feature bank : start");
         for (Resource trainImage : trainImages) {
             var imageFile = trainImage.getFile();
-            var faceFeatureVectorList = faceDetector.getFaceFeatures(imageFile);
-            if (faceFeatureVectorList != null) {
-                for (INDArray faceFeatureVector : faceFeatureVectorList) {
-                    var label = imageFile.getParentFile().getName();
-                    featureBank.put(label, faceFeatureVector);
-                }
+            var faceFeatures = faceDetector.getFaceFeatures(imageFile);
+            for (ImageFace imageFace : faceFeatures.getImageFaces()) {
+                var label = imageFile.getParentFile().getName();
+                featureBank.put(label, imageFace.getFeatureVector());
             }
         }
         logger.info("Filling feature bank : end");
@@ -64,11 +62,9 @@ public class Application {
                 break;
             }
             File file = new File(inputLine);
-            var faceFeatureVectorList = faceDetector.getFaceFeatures(file);
-            if (faceFeatureVectorList != null) {
-                for (INDArray faceFeatureVector : faceFeatureVectorList) {
-                    featureBank.getSimilar(faceFeatureVector);
-                }
+            var faceFeatures = faceDetector.getFaceFeatures(file);
+            for (ImageFace imageFace : faceFeatures.getImageFaces()) {
+                featureBank.getSimilar(imageFace.getFeatureVector());
             }
         }
     }

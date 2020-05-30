@@ -6,13 +6,21 @@ import org.nd4j.linalg.factory.Nd4j;
 import org.nd4j.linalg.indexing.conditions.Condition;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Component;
 
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.stream.Collectors;
 
+import static org.nd4j.linalg.indexing.NDArrayIndex.all;
+import static org.nd4j.linalg.indexing.NDArrayIndex.interval;
+
+@Component
 public class Nd4jUtils {
     private static final Logger logger = LoggerFactory.getLogger(Nd4jUtils.class);
 
@@ -115,5 +123,52 @@ public class Nd4jUtils {
         } catch (IOException e) {
             logger.error("error to save indArray", e);
         }
+    }
+
+    // resize image in case of it's size is bigger than scaleSize
+    public static INDArray scale(INDArray imageMatrix, int scaleSize) {
+        long[] shape = imageMatrix.shape();
+        if (shape[2] > scaleSize || shape[3] > scaleSize) {
+            var scale = shape[2] > shape[3] ? (double) scaleSize / shape[2] : (double) scaleSize / shape[3];
+            return Nd4jUtils.imresample(imageMatrix, (int) Math.ceil(shape[2] * scale), (int) Math.ceil(shape[3] * scale));
+        }
+        return imageMatrix;
+    }
+
+    public static INDArray imresample(INDArray img, int hs, int ws) {
+        long[] shape = img.shape();
+        long h = shape[2];
+        long w = shape[3];
+        float dx = (float) w / ws;
+        float dy = (float) h / hs;
+        INDArray im_data = Nd4j.create(new long[] { 1, 3, hs, ws });
+        for (int a1 = 0; a1 < 3; a1++) {
+            for (int a2 = 0; a2 < hs; a2++) {
+                for (int a3 = 0; a3 < ws; a3++) {
+                    im_data.putScalar(new long[] { 0, a1, a2, a3 },
+                            img.getDouble(0, a1, (long) Math.floor(a2 * dy), (long) Math.floor(a3 * dx)));
+                }
+            }
+        }
+        return im_data;
+    }
+
+    public List<INDArray> crop(List<BoundBox> boxes, INDArray image) {
+        if (boxes == null) {
+            return Collections.emptyList();
+        }
+        return boxes
+                .stream()
+                .map(box ->
+                        crop(box, image))
+                .collect(Collectors.toList());
+    }
+
+    public INDArray crop(BoundBox box, INDArray image) {
+        var x1 = Math.max(box.x1, 0);
+        var x2 = Math.max(box.x2, 0);
+        var y1 = Math.max(box.y1, 0);
+        var y2 = Math.max(box.y2, 0);
+        return image.get(all(), all(), interval(y1, y2), interval(x1, x2)).dup();
     }
 }

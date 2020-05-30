@@ -8,9 +8,12 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import javax.imageio.ImageIO;
+import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.nio.file.Paths;
+import java.util.Collections;
+import java.util.List;
 
 /**
  * Utility class to perform operation with image
@@ -58,5 +61,32 @@ public class ImageUtils {
      */
     public BufferedImage toBufferedImage(INDArray image) {
         return java2DFrameConverter.convert(imageLoader.asFrame(image, 8));
+    }
+
+    /**
+     * Draw bound box on image
+     *
+     * @param bboxes bound box list to draw
+     * @param image source image
+     * @return image INDArray with drawn bound boxes
+     * @throws IOException during method execution
+     */
+    public INDArray drawBoundBox(List<BoundBox> bboxes, INDArray image) throws IOException {
+        var originalImage = toBufferedImage(image);
+        var g2D = originalImage.createGraphics();
+        g2D.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+        g2D.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+        g2D.setStroke(new BasicStroke(2));
+        g2D.setColor(Color.YELLOW);
+
+        bboxes.forEach(bbox ->
+                g2D.drawRect(bbox.x1, bbox.y1, bbox.x2 - bbox.x1, bbox.y2 - bbox.y1));
+        g2D.dispose();
+        return imageLoader.asMatrix(java2DFrameConverter.convert(originalImage));
+    }
+
+    public INDArray drawBoundBox(BoundBox bbox, INDArray image) throws IOException {
+        return drawBoundBox(Collections.singletonList(bbox), image);
     }
 }
