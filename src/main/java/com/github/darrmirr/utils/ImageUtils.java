@@ -1,5 +1,6 @@
 package com.github.darrmirr.utils;
 
+import org.bytedeco.javacv.Frame;
 import org.bytedeco.javacv.Java2DFrameConverter;
 import org.datavec.image.loader.Java2DNativeImageLoader;
 import org.nd4j.linalg.api.ndarray.INDArray;
@@ -88,5 +89,9 @@ public class ImageUtils {
 
     public INDArray drawBoundBox(BoundBox bbox, INDArray image) throws IOException {
         return drawBoundBox(Collections.singletonList(bbox), image);
+    }
+
+    public Frame asFrame(BufferedImage image) {
+        return java2DFrameConverter.convert(image);
     }
 }

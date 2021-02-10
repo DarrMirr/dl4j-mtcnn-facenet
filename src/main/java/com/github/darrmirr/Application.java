@@ -11,10 +11,12 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.event.ApplicationStartedEvent;
 import org.springframework.context.event.EventListener;
+import org.springframework.core.io.FileUrlResource;
 import org.springframework.core.io.Resource;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Optional;
 import java.util.Scanner;
 
 @SpringBootApplication
@@ -26,7 +28,7 @@ public class Application {
 
     @Autowired
     public Application(
-            @Value("classpath:images/dataset/train/*/*") Resource[] trainImages,
+            @Value("classpath:images/dataset/train/*/*.*") Resource[] trainImages,
             @Qualifier(FeatureBank.DATA_SET) FeatureBank featureBank,
             FaceDetector faceDetector
     ) {
@@ -45,10 +47,9 @@ public class Application {
     private void onApplicationStartup(ApplicationStartedEvent event) throws IOException {
         logger.info("Filling feature bank : start");
         for (Resource trainImage : trainImages) {
-            var imageFile = trainImage.getFile();
-            var faceFeatures = faceDetector.getFaceFeatures(imageFile);
+            var faceFeatures = faceDetector.getFaceFeatures(trainImage);
             for (ImageFace imageFace : faceFeatures.getImageFaces()) {
-                var label = imageFile.getParentFile().getName();
+                var label = getLabel(trainImage);
                 featureBank.put(label, imageFace.getFeatureVector());
             }
         }
@@ -61,12 +62,28 @@ public class Application {
             if (inputLine.equalsIgnoreCase("exit")) {
                 break;
             }
-            File file = new File(inputLine);
-            var faceFeatures = faceDetector.getFaceFeatures(file);
+            Resource resource = new FileUrlResource(inputLine);
+            var faceFeatures = faceDetector.getFaceFeatures(resource);
             for (ImageFace imageFace : faceFeatures.getImageFaces()) {
                 featureBank.getSimilar(imageFace.getFeatureVector());
             }
         }
+    }
+
+    private String getLabel(Resource resource) throws IOException {
+        return Optional
+                .ofNullable(resource)
+                .map(Resource::getFilename)
+                .map(resource.getURL().getPath()::split)
+                .filter(urlParts ->
+                        urlParts.length != 0)
+                .map(urlParts ->
+                        urlParts[0].split(File.separator))
+                .filter(urlParts ->
+                        urlParts.length != 0)
+                .map(urlParts ->
+                        urlParts[urlParts.length - 1])
+                .orElseThrow();
     }
 
 }

@@ -26,7 +26,7 @@ public class HashMapFeatureBank implements FeatureBank {
     private FeatureVerifier featureVerifier;
 
     @Autowired
-    public HashMapFeatureBank(@Qualifier(FeatureVerifier.COSINE_DISTANCE) FeatureVerifier featureVerifier) {
+    public HashMapFeatureBank(@Qualifier(FeatureVerifier.EUCLIDEAN_DISTANCE) FeatureVerifier featureVerifier) {
         this.featureVerifier = featureVerifier;
     }
 

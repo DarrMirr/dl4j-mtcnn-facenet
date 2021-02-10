@@ -4,8 +4,8 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.springframework.core.io.Resource;
 
-import java.io.File;
 import java.util.List;
 
 @NoArgsConstructor
@@ -13,6 +13,6 @@ import java.util.List;
 @Getter
 @Setter
 public class FaceFeatures {
-    private File image;
+    private Resource image;
     private List<ImageFace> imageFaces;
 }

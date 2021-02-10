@@ -3,17 +3,16 @@ package com.github.darrmirr.models;
 import org.deeplearning4j.nn.conf.ComputationGraphConfiguration;
 import org.deeplearning4j.nn.graph.ComputationGraph;
 import org.nd4j.linalg.factory.Nd4j;
-import org.springframework.core.io.ClassPathResource;
-import org.springframework.core.io.Resource;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.function.Supplier;
 
 public interface Dl4jModel {
 
     ComputationGraphConfiguration getConfiguration();
 
-    String getWeightsPath();
+    Supplier<InputStream> modelWeights();
 
     int inputWidth();
 
@@ -22,13 +21,12 @@ public interface Dl4jModel {
     default ComputationGraph getGraph() throws IOException {
         ComputationGraph graph = new ComputationGraph(getConfiguration());
         graph.init();
-        var weightsResource = new ClassPathResource(getWeightsPath());
-        loadWeightData(weightsResource, graph);
+        loadWeightsTo(graph);
         return graph;
     }
 
-    default void loadWeightData(Resource weightsResource, ComputationGraph graph) throws IOException {
-        try (InputStream in = weightsResource.getInputStream()) {
+    default void loadWeightsTo(ComputationGraph graph) throws IOException {
+        try (InputStream in = modelWeights().get()) {
             var buf = new byte[4];
             var layers = graph.getLayers();
             for (org.deeplearning4j.nn.api.Layer l : layers) {
@@ -44,7 +42,6 @@ public interface Dl4jModel {
             }
         }
     }
-
 
     default float bytes2Float(byte[] arr) {
         int value = 0;
