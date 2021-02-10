@@ -16,17 +16,23 @@ import org.deeplearning4j.nn.conf.layers.*;
 import org.deeplearning4j.nn.weights.WeightInit;
 import org.nd4j.linalg.activations.Activation;
 import org.nd4j.linalg.api.ndarray.INDArray;
-import org.nd4j.linalg.io.ClassPathResource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Component;
 
-import javax.annotation.PostConstruct;
-import java.io.*;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.SequenceInputStream;
 import java.lang.reflect.Field;
-import java.nio.file.Files;
-import java.nio.file.Paths;
-import java.util.*;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.function.Supplier;
+import java.util.stream.Collectors;
 
 import static java.util.Collections.enumeration;
 import static org.deeplearning4j.nn.conf.ConvolutionMode.Truncate;
@@ -34,48 +40,40 @@ import static org.deeplearning4j.nn.conf.ConvolutionMode.Truncate;
 @Component
 public class InceptionResNetV1 implements Dl4jModel {
     private static final Logger logger = LoggerFactory.getLogger(InceptionResNetV1.class);
-    private static final String WEIGHTS_PATH = "models/inceptionResNetV1/InceptionResNetV1Data";
+    private static final String WEIGHTS_PATH = "models/inceptionResNetV1/*";
     private ComputationGraphConfiguration graphConfiguration;
+    private Resource[] modelParts;
 
-    public InceptionResNetV1(long[] inputShape) {
+    @Autowired
+    public InceptionResNetV1(@Value("classpath:" + WEIGHTS_PATH) Resource[] modelParts)  {
+        this.modelParts = modelParts;
         try {
-            graphConfiguration = buildConfiguration(inputShape);
+            graphConfiguration = buildConfiguration(new long[] { 160, 160, 3 });
         } catch (Exception e) {
             logger.error("error to build ComputationGraphConfiguration", e);
         }
     }
 
-    @PostConstruct
-    public void init() throws IOException {
-        var weightsResource = new ClassPathResource(WEIGHTS_PATH);
-        if (!weightsResource.exists()) {
-            logger.info("merge weights into one file");
-            var weightsDirPath = Paths.get(WEIGHTS_PATH).getParent().toString();
-            var weightsDirResource = new ClassPathResource(weightsDirPath);
-
-            var splittedFilesSet = Optional
-                    .of(weightsDirResource.getFile())
-                    .map(File::listFiles)
-                    .map(Arrays::asList)
-                    .map(TreeSet::new)
-                    .orElseThrow();
-
-            var splittedInputStreams = new LinkedList<InputStream>();
-            for (File file : splittedFilesSet) {
-                splittedInputStreams.add(new FileInputStream(file));
+    @Override
+    public Supplier<InputStream> modelWeights() {
+        return () -> {
+            var modelPartsStreams = Arrays
+                    .stream(modelParts)
+                    .map(resource -> {
+                        try {
+                            return resource.getInputStream();
+                        } catch (IOException e) {
+                            throw new IllegalStateException(e);
+                        }
+                    })
+                    .collect(Collectors.toList());
+            try(InputStream is = new SequenceInputStream(enumeration(modelPartsStreams))) {
+                return new ByteArrayInputStream(is.readAllBytes());
+            } catch (IOException e) {
+                logger.error("error to get model data", e);
+                throw new IllegalStateException(e);
             }
-
-            try(var inputStream = new SequenceInputStream(enumeration(splittedInputStreams))) {
-                var weightsPath = Paths.get(weightsDirResource.getFile().getAbsolutePath(), weightsResource.getFilename());
-                Files.copy(inputStream, weightsPath);
-            }
-        } else {
-            logger.info("merge weights into one file is not required");
-        }
-    }
-
-    public InceptionResNetV1()  {
-        this(new long[] { 160, 160, 3 });
+        };
     }
 
     @Override
@@ -83,10 +81,6 @@ public class InceptionResNetV1 implements Dl4jModel {
         return graphConfiguration;
     }
 
-    @Override
-    public String getWeightsPath() {
-        return WEIGHTS_PATH;
-    }
 
     @Override
     public int inputWidth() {

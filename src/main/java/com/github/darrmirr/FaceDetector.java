@@ -12,11 +12,13 @@ import org.deeplearning4j.nn.graph.ComputationGraph;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.PostConstruct;
-import java.io.File;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.Collections;
 import java.util.List;
 
@@ -24,11 +26,10 @@ import static java.util.stream.Collectors.toList;
 
 /**
  * Getting Face Features
- *
+ * <p>
  * Process consist two stages:
- * 1. Detect faces in image using MTCNN
+ * 1. Detect faces on image using MTCNN
  * 2. Extract face features from detected face
- *
  */
 
 @Component
@@ -55,23 +56,25 @@ public class FaceDetector {
     }
 
     /**
-     * Detect faces in image
+     * Detect faces on image
      *
      * @param image image file
      * @return array of detected images
      * @throws IOException exception while file is read
      */
 
-    public List<ImageFace> detectFaces(File image) throws IOException {
-        var imageMatrix = loader.asMatrix(image);
-        return mtcnn
-                .detectFaces(imageMatrix)
-                .stream()
-                .map(boundBox -> {
-                    var imageFace = nd4jUtils.crop(boundBox, imageMatrix);
-                    return new ImageFace(imageFace, boundBox);
-                })
-                .collect(toList());
+    public List<ImageFace> detectFaces(Resource image) throws IOException {
+        try (InputStream is = image.getInputStream()) {
+            var imageMatrix = loader.asMatrix(is);
+            return mtcnn
+                    .detectFaces(imageMatrix)
+                    .stream()
+                    .map(boundBox -> {
+                        var imageFace = nd4jUtils.crop(boundBox, imageMatrix);
+                        return new ImageFace(imageFace, boundBox);
+                    })
+                    .collect(toList());
+        }
     }
 
     /**
@@ -98,23 +101,23 @@ public class FaceDetector {
      * @throws IOException exception while file is read
      */
 
-    public FaceFeatures getFaceFeatures(File image) throws IOException {
-        logger.info("start : {}", image.getName());
+    public FaceFeatures getFaceFeatures(Resource image) throws IOException {
+        logger.info("start : {}", image.getFilename());
         var detectedFaces = detectFaces(image);
 
-        if(detectedFaces == null || detectedFaces.isEmpty()) {
+        if (detectedFaces == null || detectedFaces.isEmpty()) {
             logger.warn("no face detected in image file : {}", image);
             return new FaceFeatures(image, Collections.emptyList());
         }
 
-        if(logger.isDebugEnabled()) {
+        if (logger.isDebugEnabled()) {
             logger.debug("save detected face image");
             for (int i = 0; i < detectedFaces.size(); i++) {
-                imageUtils.toFile(detectedFaces.get(i).getImageFace(), "jpg", i + "_" + image.getName() );
+                imageUtils.toFile(detectedFaces.get(i).getImageFace(), "jpg", i + "_" + image.getFilename());
             }
         }
         var imageFaces = extractFeatures(detectedFaces);
-        logger.info("end : {}", image.getName());
+        logger.info("end : {}", image.getFilename());
         return new FaceFeatures(image, imageFaces);
     }
 }

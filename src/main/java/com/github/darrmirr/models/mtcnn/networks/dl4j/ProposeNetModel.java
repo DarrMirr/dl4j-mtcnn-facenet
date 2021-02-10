@@ -7,13 +7,21 @@ import org.deeplearning4j.nn.conf.ComputationGraphConfiguration;
 import org.deeplearning4j.nn.conf.ConvolutionMode;
 import org.deeplearning4j.nn.conf.NeuralNetConfiguration;
 import org.deeplearning4j.nn.conf.layers.ConvolutionLayer;
-import org.deeplearning4j.nn.conf.layers.PReLULayer;
 import org.deeplearning4j.nn.conf.layers.SubsamplingLayer;
 import org.nd4j.linalg.activations.Activation;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
+
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.function.Supplier;
 
 @Component
 public class ProposeNetModel implements Dl4jModel {
+    private static final Logger logger = LoggerFactory.getLogger(ProposeNetModel.class);
     private static final String WEIGHTS_PATH = "models/mtcnn/weights/PNetData";
     private ComputationGraphConfiguration graphConfiguration;
 
@@ -97,7 +105,17 @@ public class ProposeNetModel implements Dl4jModel {
     }
 
     @Override
-    public String getWeightsPath() {
-        return WEIGHTS_PATH;
+    public Supplier<InputStream> modelWeights() {
+        return () -> {
+            try {
+                var resource = new ClassPathResource(WEIGHTS_PATH);
+                try(InputStream is = resource.getInputStream()) {
+                    return new ByteArrayInputStream(is.readAllBytes());
+                }
+            } catch (IOException e) {
+                logger.error("error to get model weights", e);
+                throw new IllegalStateException(e);
+            }
+        };
     }
 }
